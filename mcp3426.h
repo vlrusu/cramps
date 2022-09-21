@@ -18,7 +18,7 @@ typedef struct {
 
 
 void _mcp3426_init(mcp3426_t* self, I2C* i2c);
-int _mcp3426_setconfig(mcp3426_t* self, int gain, int samplerate, int mode, int channel);
+int _mcp3426_setconfig(mcp3426_t* self, int channel);
 float _mcp3426_read(mcp3426_t* self);
 
 #endif

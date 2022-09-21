@@ -52,14 +52,15 @@ I2C i2c_cramps[24];
 
 #define MAX_LINE_LENGTH 24
 
+int SlotCounter = 0;
 
 mcp3426_t adc[48];
 int enabledSlots[MAX_LINE_LENGTH];
 
-
+float currents[48];
 
 void intHandler(int dummy) {
-    keepRunning = 0;
+  keepRunning = 0;
 }
 
 
@@ -110,7 +111,7 @@ void initialization(){
   /* bme280_get_regs(BME280_CHIP_ID_ADDR,&ptscalchipid,1,&ptscal); */
 
 
-    //setup MCPs for cramps
+  //setup MCPs for cramps
   for (int imcp = MCPHV0; imcp<=MCPHV3; imcp++){
     MCP_setup (&crampMCP[imcp], 0, 0, 0x20 + imcp );
   }
@@ -123,73 +124,72 @@ void initialization(){
   /* MCP_pinWrite(&crampMCP[which], pin, 1); */
 
 
-/*   uint8_t value = 0x0; */
-/*   MCP_byteWrite(&crampMCP[which], IODIRA, value); */
-/*   MCP_byteWrite(&crampMCP[which], IODIRB, value); */
+  /*   uint8_t value = 0x0; */
+  /*   MCP_byteWrite(&crampMCP[which], IODIRA, value); */
+  /*   MCP_byteWrite(&crampMCP[which], IODIRB, value); */
 
 
-/*   value = 0x0;   */
-/*   MCP_byteWrite(&crampMCP[which], GPIOA, value); */
-/*   MCP_byteWrite(&crampMCP[which], GPIOB, value); */
-/*   value = 0; */
+  /*   value = 0x0;   */
+  /*   MCP_byteWrite(&crampMCP[which], GPIOA, value); */
+  /*   MCP_byteWrite(&crampMCP[which], GPIOB, value); */
+  /*   value = 0; */
 
-/*   value = MCP_byteRead(&crampMCP[which], GPIOA); */
-/* printf("VAL1=%x\n",value); */
-/*   value = MCP_byteRead(&crampMCP[which], GPIOB); */
-
-
-//  printf("VAL2=%x\n",value);
-//  exit(1);
+  /*   value = MCP_byteRead(&crampMCP[which], GPIOA); */
+  /* printf("VAL1=%x\n",value); */
+  /*   value = MCP_byteRead(&crampMCP[which], GPIOB); */
 
 
-    char *path;
-    char line[MAX_LINE_LENGTH] = {0};
+  //  printf("VAL2=%x\n",value);
+  //  exit(1);
 
-    // read enabled channels from input.txt
-    path = "input.txt";
 
-    int slotCounter = 0;
-    FILE *file = fopen(path, "r");
-    for (int i = 0; i < MAX_LINE_LENGTH; i++) {
-        enabledSlots[i] = -1;
+  char *path;
+  char line[MAX_LINE_LENGTH] = {0};
+
+  // read enabled channels from input.txt
+  path = "input.txt";
+
+  FILE *file = fopen(path, "r");
+  for (int i = 0; i < MAX_LINE_LENGTH; i++) {
+    enabledSlots[i] = -1;
+  }
+  while(fgets(line, MAX_LINE_LENGTH, file)){
+    enabledSlots[SlotCounter] = atoi(line);
+    SlotCounter++;
+  }
+  fclose(file);
+
+
+  //initialize cramps
+  for (int i = 0; i < SlotCounter; i++) {
+
+
+
+      printf("Enabling slot %d\n", enabledSlots[i]);
+      if (enabledSlots[i]>=0 && enabledSlots[i] <14){
+	I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV0], 1, &crampMCP[MCPHV0], enabledSlots[i]+2); //SCL SDA
+	_mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
+      }
+      if (enabledSlots[i]>=14 && enabledSlots[i] <24){
+	I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV0], 1 , &crampMCP[MCPHV1], enabledSlots[i]-14);
+	_mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
+
+	//  _mcp3426_init(&adc[enabledSlots[i]], MCPPINBASE+16*MCPHV1+(enabledSlots[i]-14),MCPPINBASE+16*MCPHV0+1); 
+      }
+      if (enabledSlots[i]>=24 && enabledSlots[i] <38){
+	I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV2], 1, &crampMCP[MCPHV2], enabledSlots[i]-24+2);
+	_mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
+
+	// _mcp3426_init(&adc[enabledSlots[i]], MCPPINBASE+16*MCPHV2+(enabledSlots[i]-24+2),MCPPINBASE+16*MCPHV2+1);       
+      }
+      if (enabledSlots[i]>=38 && enabledSlots[i] <48){
+	I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV2], 1, &crampMCP[MCPHV3], enabledSlots[i]-38);
+	_mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
+
+	//_mcp3426_init(&adc[enabledSlots[i]], MCPPINBASE+16*MCPHV3+(enabledSlots[i]-38),MCPPINBASE+16*MCPHV2+1); 
+
     }
-    while(fgets(line, MAX_LINE_LENGTH, file)){
-        enabledSlots[slotCounter] = atoi(line);
-        slotCounter++;
-    }
-    fclose(file);
-
-
-    //initialize cramps
-    for (int i = 0; i < MAX_LINE_LENGTH; i++) {
-
-
-        if (enabledSlots[i] >= 0) {
-            printf("Enabling slot %d\n", enabledSlots[i]);
-            if (enabledSlots[i]>=0 && enabledSlots[i] <14){
-	      I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV0], 1, &crampMCP[MCPHV0], enabledSlots[i]+2); //SCL SDA
-	      _mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
-            }
-            if (enabledSlots[i]>=14 && enabledSlots[i] <24){
-	      I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV0], 1 , &crampMCP[MCPHV1], enabledSlots[i]-14);
-	      _mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
-
-	      //  _mcp3426_init(&adc[enabledSlots[i]], MCPPINBASE+16*MCPHV1+(enabledSlots[i]-14),MCPPINBASE+16*MCPHV0+1); 
-            }
-            if (enabledSlots[i]>=24 && enabledSlots[i] <38){
-	      I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV2], 1, &crampMCP[MCPHV2], enabledSlots[i]-24+2);
-	      _mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
-
-	    // _mcp3426_init(&adc[enabledSlots[i]], MCPPINBASE+16*MCPHV2+(enabledSlots[i]-24+2),MCPPINBASE+16*MCPHV2+1);       
-            }
-            if (enabledSlots[i]>=38 && enabledSlots[i] <48){
-	      I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV2], 1, &crampMCP[MCPHV3], enabledSlots[i]-38);
-	      _mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
-
-	      //_mcp3426_init(&adc[enabledSlots[i]], MCPPINBASE+16*MCPHV3+(enabledSlots[i]-38),MCPPINBASE+16*MCPHV2+1); 
-            }
-        }
-    }
+  }
 
 
 
@@ -213,123 +213,143 @@ int main(int argc, char *argv[])
 
 
   int n = 0;
-  time_t tic = time(NULL);
-  time_t toc = time(NULL); //define clock ticks
-
-  float current1 = 0;
-  float current2 = 0;
-  float ave1 = 0;
-  float ave2 = 0;
-
-  clock_t t;
-  t = clock();
 
 
   while (keepRunning){
-          time_t t = time(NULL);
-        struct tm tm = *localtime(&t);
-        fprintf(fpt, "%d-%d-%d %d:%d:%d,", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-  for (int i = 0; i < MAX_LINE_LENGTH; i++) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    
 
+    char * p = ctime(&ts.tv_sec); /* Note that ctime() isn't thread-safe. */
+    p[strcspn(p, "\r\n")] = 0;
+
+    //    fprintf(fpt, "%d-%d-%d %d:%d:%d,", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    //    printf("%s %7.1f\n", p, ts.tv_nsec/1e6);
+    fprintf(fpt,"%s %7.1f ", p, ts.tv_nsec/1e6);
+
+
+    //first do the 0 channels
+    for (int i = 0; i < SlotCounter; i++) {
   
-    if (enabledSlots[i] >= 0) {
-      current1 = 0;
-      current2 = 0;
+      if (enabledSlots[i] >= 0) {
+	currents[2*i] = 0;
 
         int tmp = 0;
-	tmp =  _mcp3426_setconfig(&adc[enabledSlots[i]],0,2,0,0);
-	current1 = 1e2*_mcp3426_read(&adc[enabledSlots[i]]);
-        /* if (i%50==0){ */
-	//        printf( "---z%d (%.0f)---\n", enabledSlots[i],  ((double)(toc - tic)));
-	//        printf( "current 1 (nA) = %4.3f\n",current1);
-        /* } */
-        tmp = 0;
-	tmp = _mcp3426_setconfig(&adc[enabledSlots[i]],0,2,0,1);
-	current2 = 1e2*_mcp3426_read(&adc[enabledSlots[i]]);
-
-        /* if (i%50==0){ */
-	//        printf( "current 2 (nA) = %4.3f\n",current2);
-	//        printf( "\n" );
-        /* } */
-        ave1 = ave1+current1;
-        ave2 = ave2+current2;
-        n = n + 1;
-
-	fprintf(fpt, "%.3f,%.3f,", current1, current2);
+	tmp =  _mcp3426_setconfig(&adc[enabledSlots[i]],0);
+	//	sleep(1);
+	currents[2*i] = 1e2*_mcp3426_read(&adc[enabledSlots[i]]);
 
       }
-  }
-  fprintf(fpt,"\n");
-  }
-  toc = time(NULL);
+    }
+    //now do the 1 channels
+    for (int i = 0; i < SlotCounter; i++) {
+  
+      if (enabledSlots[i] >= 0) {
+	currents[2*i+1] = 0;
 
-  t = clock() - t;
-  double time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds
-  printf( "--- (%4.2f)---\n",  time_taken);
+        int tmp = 0;
+	tmp =  _mcp3426_setconfig(&adc[enabledSlots[i]],0);
+	//	sleep(1);
+	currents[2*i+1] = 1e2*_mcp3426_read(&adc[enabledSlots[i]]);
+
+      }
+    }
+
+
+
+
+
+
+
+    for (int i = 0; i < SlotCounter; i++) {
+      
+	
+      //      printf("%d %.3f,%.3f\n", enabledSlots[i],currents[2*i], currents[2*i+1]);
+      fprintf(fpt," %.3f,%.3f", currents[2*i], currents[2*i+1]);
+
+    }
+    fprintf(fpt,"\n");
+
+
+    /*
+    struct timespec tend;
+    clock_gettime(CLOCK_REALTIME, &tend);
+
+    double seconds = (tend.tv_sec - ts.tv_sec) + (tend.tv_nsec - ts.tv_nsec)/1e9;
+ 
+    printf("%f seconds\n", seconds);
+    */
+
+
+
+    
+
+}
+  
   /*
- uint8_t settings_sel;
- struct bme280_data comp_data;
+    uint8_t settings_sel;
+    struct bme280_data comp_data;
 
- // Recommended mode of operation: Indoor navigation
- ptscal.settings.osr_h = BME280_OVERSAMPLING_16X;
- ptscal.settings.osr_p = BME280_OVERSAMPLING_16X;
- ptscal.settings.osr_t = BME280_OVERSAMPLING_2X;
- ptscal.settings.filter = BME280_FILTER_COEFF_16;
+    // Recommended mode of operation: Indoor navigation
+    ptscal.settings.osr_h = BME280_OVERSAMPLING_16X;
+    ptscal.settings.osr_p = BME280_OVERSAMPLING_16X;
+    ptscal.settings.osr_t = BME280_OVERSAMPLING_2X;
+    ptscal.settings.filter = BME280_FILTER_COEFF_16;
 
- settings_sel = BME280_OSR_PRESS_SEL | BME280_OSR_TEMP_SEL | BME280_OSR_HUM_SEL | BME280_FILTER_SEL;
+    settings_sel = BME280_OSR_PRESS_SEL | BME280_OSR_TEMP_SEL | BME280_OSR_HUM_SEL | BME280_FILTER_SEL;
 
- int8_t rslt = BME280_OK;
+    int8_t rslt = BME280_OK;
  
- rslt = bme280_set_sensor_settings(settings_sel, &ptscal);
+    rslt = bme280_set_sensor_settings(settings_sel, &ptscal);
 
- // float req_delay = bme280_cal_meas_delay(ptscal.settings);
- // printf("delay=%5.2f\n",req_delay);
- ptscal.delay_ms(10);
+    // float req_delay = bme280_cal_meas_delay(ptscal.settings);
+    // printf("delay=%5.2f\n",req_delay);
+    ptscal.delay_ms(10);
 
- signal(SIGINT, intHandler);
- printf("datetime, temp_1, hum_1, temp_2, press, hum_2 \n");
- // while(1 && keepRunning){
- rslt = bme280_set_sensor_mode(BME280_FORCED_MODE, &ptscal);
- ptscal.delay_ms(100);
+    signal(SIGINT, intHandler);
+    printf("datetime, temp_1, hum_1, temp_2, press, hum_2 \n");
+    // while(1 && keepRunning){
+    rslt = bme280_set_sensor_mode(BME280_FORCED_MODE, &ptscal);
+    ptscal.delay_ms(100);
  
- rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &ptscal);
+    rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &ptscal);
 
- float  temp = comp_data.temperature;
- float  press = 0.01 * comp_data.pressure;
- float  hum = comp_data.humidity;
- //printf("%0.2lf deg C, %0.2lf hPa, %0.2lf%%\n", temp, press, hum);
+    float  temp = comp_data.temperature;
+    float  press = 0.01 * comp_data.pressure;
+    float  hum = comp_data.humidity;
+    //printf("%0.2lf deg C, %0.2lf hPa, %0.2lf%%\n", temp, press, hum);
 
 
- time_t t = time(NULL);
- struct tm tm = *localtime(&t);
- // printf("%d-%d-%d %d:%d:%d,", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    // printf("%d-%d-%d %d:%d:%d,", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 
  
   
-  uint16_t this_temp = 0;
-  uint16_t this_humidity = 0;
+    uint16_t this_temp = 0;
+    uint16_t this_humidity = 0;
 
 
-  rslt = hdc2080_trigger_measurement(&hdc);
-  rslt = hdc2080_read_temp(&hdc, &this_temp);
-  rslt = hdc2080_read_humidity(&hdc, &this_humidity);
+    rslt = hdc2080_trigger_measurement(&hdc);
+    rslt = hdc2080_read_temp(&hdc, &this_temp);
+    rslt = hdc2080_read_humidity(&hdc, &this_humidity);
 
-  float temp_hdc = ( (float) this_temp)/65536*165-40;
-  float hum_hdc =( (float)this_humidity)/65536*100;
+    float temp_hdc = ( (float) this_temp)/65536*165-40;
+    float hum_hdc =( (float)this_humidity)/65536*100;
 
   
-  //  printf("HDC %d %d\n",this_temp,this_humidity);
-  //  printf("BME %5.2f %5.2f %5.2f\n",temp_bme,pres_bme,hum_bme);
- fprintf(pFile, "SENSOR %d-%d-%d %d:%d, %5.2f, %5.2f, %0.2lf, %0.2lf, %0.2lf\n",tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min,temp_hdc,hum_hdc,temp, press, hum);
+    //  printf("HDC %d %d\n",this_temp,this_humidity);
+    //  printf("BME %5.2f %5.2f %5.2f\n",temp_bme,pres_bme,hum_bme);
+    fprintf(pFile, "SENSOR %d-%d-%d %d:%d, %5.2f, %5.2f, %0.2lf, %0.2lf, %0.2lf\n",tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min,temp_hdc,hum_hdc,temp, press, hum);
 
- printf("SENSOR %d-%d-%d %d:%d, %5.2f, %5.2f, %0.2lf, %0.2lf, %0.2lf\n",tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min,temp_hdc,hum_hdc,temp, press, hum);
+    printf("SENSOR %d-%d-%d %d:%d, %5.2f, %5.2f, %0.2lf, %0.2lf, %0.2lf\n",tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min,temp_hdc,hum_hdc,temp, press, hum);
  
- fclose(pFile); 
+    fclose(pFile); 
 
 
-*/
+  */
 
   //  delay(10000);
   //}
