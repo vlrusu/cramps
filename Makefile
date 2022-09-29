@@ -32,12 +32,12 @@ INCLUDE	= -I/usr/local/include -I ./
 CFLAGS	= $(DEBUG) -Wall $(INCLUDE) -Winline -pipe
 
 LDFLAGS	= -L/usr/local/lib
-LDLIBS    = -lpthread -lm -lcrypt -lrt
+LDLIBS    = -lpthread -lm -lcrypt -lrt -lwiringPi
 
 # Should not alter anything below this line
 ###############################################################################
 
-SRC	=	main.c bme280.c I2C.c MCP23S17.c SPI_daisy.c HDC2080.c 
+SRC	=	main.c bme280.c I2C.c MI2C.c MCP23S17.c SPI_daisy.c HDC2080.c MI2C.o AMBmcp3426.o reset.o
 
 OBJ	=	$(SRC:.c=.o)
 
@@ -50,9 +50,12 @@ all:
 
 really-all:	$(BINS)
 
-main:	main.o bme280.o MCP23S17.o  SPI_daisy.o HDC2080.o   mcp3426.o I2C.o
+main:	main.o bme280.o MCP23S17.o  SPI_daisy.o HDC2080.o   AMBmcp3426.o I2C.o MI2C.o
 	$Q echo [link]
-	$Q $(CC) -o $@ main.o MCP23S17.o  mcp3426.o bme280.o I2C.o SPI_daisy.o HDC2080.o $(LDFLAGS) $(LDLIBS)
+	$Q $(CC) -o $@ main.o MCP23S17.o  AMBmcp3426.o bme280.o I2C.o SPI_daisy.o HDC2080.o MI2C.o $(LDFLAGS) $(LDLIBS)
+reset:	reset.o bme280.o MCP23S17.o  SPI_daisy.o HDC2080.o   AMBmcp3426.o I2C.o MI2C.o
+	$Q echo [link]
+	$Q $(CC) -o $@ reset.o MCP23S17.o  AMBmcp3426.o bme280.o I2C.o SPI_daisy.o HDC2080.o MI2C.o $(LDFLAGS) $(LDLIBS)
 
 
 

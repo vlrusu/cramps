@@ -61,7 +61,7 @@ void MI2C_read(MI2C *self, uint8_t last, uint16_t* dataByByte)
     uint8_t i;
     for (i = 0; i < 8; i++) {
       //       b <<= 1;
-        usleep(MI2C_DELAY_USEC);
+      //        usleep(MI2C_DELAY_USEC);
         MCP_pinWrite(self->_mcp_scl, self->_sclPin, 1);
 
 	tmp[i] = MCP_pinReadAll(self->_mcp_sda) ;
@@ -72,7 +72,7 @@ void MI2C_read(MI2C *self, uint8_t last, uint16_t* dataByByte)
     MCP_maskpinMode(self->_mcp_sda, self->_sdaPinMask, MCP_OUTPUT);
     MCP_maskWrite(self->_mcp_sda, self->_sdaPinMask, last);
     MCP_pinWrite(self->_mcp_scl, self->_sclPin, 1);
-    usleep(MI2C_DELAY_USEC);
+    //    usleep(MI2C_DELAY_USEC);
 
     MCP_pinWrite(self->_mcp_scl, self->_sclPin, 0);
     MCP_maskWrite(self->_mcp_sda, self->_sdaPinMask, 0);
@@ -100,9 +100,9 @@ void MI2C_read(MI2C *self, uint8_t last, uint16_t* dataByByte)
 uint8_t MI2C_start(MI2C *self, uint8_t addressRW) {
   MCP_pinWrite(self->_mcp_scl, self->_sclPin, 1);
   MCP_maskWrite(self->_mcp_sda, self->_sdaPinMask, 1);
-  usleep(MI2C_DELAY_USEC);
+  //  usleep(MI2C_DELAY_USEC);
   MCP_maskWrite(self->_mcp_sda, self->_sdaPinMask, 0);
-  usleep(MI2C_DELAY_USEC);
+  //  usleep(MI2C_DELAY_USEC);
   MCP_pinWrite(self->_mcp_scl, self->_sclPin, 0);
   return MI2C_write(self, addressRW);
 }
@@ -110,11 +110,11 @@ uint8_t MI2C_start(MI2C *self, uint8_t addressRW) {
 
 void MI2C_stop(MI2C *self) {
     MCP_maskWrite(self->_mcp_sda, self->_sdaPinMask, 0);
-    usleep(MI2C_DELAY_USEC);
+    //    usleep(MI2C_DELAY_USEC);
     MCP_pinWrite(self->_mcp_scl, self->_sclPin, 1);
-    usleep(MI2C_DELAY_USEC);
+    //    usleep(MI2C_DELAY_USEC);
     MCP_maskWrite(self->_mcp_sda, self->_sdaPinMask, 1);
-    usleep(MI2C_DELAY_USEC);
+    //    usleep(MI2C_DELAY_USEC);
 }
 
 
@@ -124,7 +124,7 @@ uint8_t MI2C_write(MI2C *self, uint8_t data) {
     for (m = 0X80; m != 0; m >>= 1) {
         MCP_maskWrite(self->_mcp_sda, self->_sdaPinMask, m & data);
         MCP_pinWrite(self->_mcp_scl, self->_sclPin, 1);
-        usleep(MI2C_DELAY_USEC);
+	//        usleep(MI2C_DELAY_USEC);
         MCP_pinWrite(self->_mcp_scl, self->_sclPin, 0);
     }
 

@@ -4,8 +4,9 @@
 #include <stdint.h>
 #include "MI2C.h"
 
-#define AMBMCP3426_FS 32768
-//#define AMBMCP3426_FS 8192
+//#define AMBMCP3426_FS 32768
+#define AMBMCP3426_FS 8192
+//#define AMBMCP3426_FS 4096
 #define AMBMCP3426_REFV 2.048
 #define AMBMCP3426_ADDRESS 0x68
 

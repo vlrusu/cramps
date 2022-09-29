@@ -160,8 +160,10 @@
 typedef struct{
     uint8_t _address;                        // Address of the MCP23S17 in use
     int _spifd ;                              // SPI file descriptor
-    uint8_t _outputACache;
-    uint8_t _outputBCache;
+    uint16_t _outputCache;
+    uint16_t _pullupCache;
+    uint16_t _invertCache;
+    uint16_t _modeCache;
 } MCP;
 
 void MCP_setup( MCP* mcp, uint8_t spibus, uint8_t ss, uint8_t address);
@@ -177,5 +179,15 @@ void MCP_setup( MCP* mcp, uint8_t spibus, uint8_t ss, uint8_t address);
 
     uint8_t MCP_pinRead(MCP *mcp, uint8_t);            // Reads an individual input pin
     uint8_t MCP_byteRead(MCP *mcp, uint8_t);               // Reads an individual register and returns the byte. Argument is the register address
+
+void MCP_wordWrite(MCP *mcp, uint8_t, uint16_t);
+uint16_t MCP_wordRead(MCP *mcp, uint8_t); 
+uint16_t MCP_pinReadAll(MCP *mcp);
+
+
+void MCP_maskWrite(MCP *mcp, uint16_t mask, uint8_t value);
+void MCP_maskpullupMode(MCP *mcp, uint16_t mask, uint8_t value);
+void MCP_maskpinMode(MCP *mcp, uint16_t mask, uint8_t mode);
+
 
 #endif //MCP23S17

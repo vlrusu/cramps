@@ -17,9 +17,9 @@
 #include "bme280.h"
 #include "bme280_defs.h"
 #include "MCP23S17.h"
-#include "mcp3426.h"
+#include "AMBmcp3426.h"
 #include <signal.h>
-
+#include <wiringPi.h>
 
 #define MCPPINBASE 100
 #define BMESCLK 2
@@ -48,22 +48,56 @@ static volatile int keepRunning = 1;
 
 enum MCPs{MCPHV0, MCPHV1, MCPHV2, MCPHV3};
 MCP crampMCP[4];
-I2C i2c_cramps[24];
+MI2C mi2c_cramps[4];
 
 #define MAX_LINE_LENGTH 24
 
 int SlotCounter = 0;
 
-mcp3426_t adc[48];
+AMBmcp3426_t adc[4];
 int enabledSlots[MAX_LINE_LENGTH];
 
-float currents[48];
 
 void intHandler(int dummy) {
   keepRunning = 0;
 }
 
+void readInput(){
+  char *path;
+  char line[MAX_LINE_LENGTH] = {0};
 
+  // read enabled channels from input.txt
+  path = "input.txt";
+
+  FILE *file = fopen(path, "r");
+  for (int i = 0; i < MAX_LINE_LENGTH; i++) {
+    enabledSlots[i] = -1;
+  }
+  while(fgets(line, MAX_LINE_LENGTH, file)){
+    enabledSlots[SlotCounter] = atoi(line);
+    SlotCounter++;
+  }
+  fclose(file);
+}
+
+void recover(){
+
+
+  printf("Recovering\n");
+  pinMode(1, OUTPUT);
+  digitalWrite(1, LOW);
+
+  sleep(1);
+
+  digitalWrite(10,LOW);
+
+  sleep(1);
+
+  pinMode(1, OUTPUT);
+  digitalWrite(1, HIGH);
+
+  
+}
 
 
 int mygetch ( void )
@@ -81,7 +115,7 @@ int mygetch ( void )
   return ch;
 }
 
-void initialization(){
+void initialization(int crampchannel){
 
   //setup MCP
 
@@ -143,146 +177,214 @@ void initialization(){
   //  exit(1);
 
 
-  char *path;
-  char line[MAX_LINE_LENGTH] = {0};
 
-  // read enabled channels from input.txt
-  path = "input.txt";
-
-  FILE *file = fopen(path, "r");
-  for (int i = 0; i < MAX_LINE_LENGTH; i++) {
-    enabledSlots[i] = -1;
-  }
-  while(fgets(line, MAX_LINE_LENGTH, file)){
-    enabledSlots[SlotCounter] = atoi(line);
-    SlotCounter++;
-  }
-  fclose(file);
-
-
+  uint16_t crampMasks[4]= {0,0,0,0};
   //initialize cramps
   for (int i = 0; i < SlotCounter; i++) {
 
-
-
       printf("Enabling slot %d\n", enabledSlots[i]);
-      if (enabledSlots[i]>=0 && enabledSlots[i] <14){
-	I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV0], 1, &crampMCP[MCPHV0], enabledSlots[i]+2); //SCL SDA
-	_mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
-      }
-      if (enabledSlots[i]>=14 && enabledSlots[i] <24){
-	I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV0], 1 , &crampMCP[MCPHV1], enabledSlots[i]-14);
-	_mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
 
-	//  _mcp3426_init(&adc[enabledSlots[i]], MCPPINBASE+16*MCPHV1+(enabledSlots[i]-14),MCPPINBASE+16*MCPHV0+1); 
-      }
-      if (enabledSlots[i]>=24 && enabledSlots[i] <38){
-	I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV2], 1, &crampMCP[MCPHV2], enabledSlots[i]-24+2);
-	_mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
+      
+      if (enabledSlots[i]>=0 && enabledSlots[i] <14)
+	crampMasks[0] |= (1<< (enabledSlots[i]+2));
+      if (enabledSlots[i]>=14 && enabledSlots[i] <24)
+	crampMasks[1] |= (1<< (enabledSlots[i]-14));
+      if (enabledSlots[i]>=24 && enabledSlots[i] <38)
+	crampMasks[2] |= (1<< (enabledSlots[i]-24+2));
+      if (enabledSlots[i]>=38 && enabledSlots[i] <48)
+	crampMasks[3] |= (1<< (enabledSlots[i]-38));
+  }
+	
+  //  printf("crampMask3=%x\n",crampMasks[3]);
+  MI2C_setup(&mi2c_cramps[0], &crampMCP[MCPHV0], crampMasks[0], &crampMCP[MCPHV0], 1); //SDA SCL - this is new
+  MI2C_setup(&mi2c_cramps[1], &crampMCP[MCPHV1], crampMasks[1], &crampMCP[MCPHV0], 1); //SDA SCL - this is new
+  MI2C_setup(&mi2c_cramps[2], &crampMCP[MCPHV2], crampMasks[2], &crampMCP[MCPHV2], 1); //SDA SCL - this is new
+  MI2C_setup(&mi2c_cramps[3], &crampMCP[MCPHV3], crampMasks[3], &crampMCP[MCPHV2], 1); //SDA SCL - this is new  
 
-	// _mcp3426_init(&adc[enabledSlots[i]], MCPPINBASE+16*MCPHV2+(enabledSlots[i]-24+2),MCPPINBASE+16*MCPHV2+1);       
-      }
-      if (enabledSlots[i]>=38 && enabledSlots[i] <48){
-	I2C_setup(&i2c_cramps[i],&crampMCP[MCPHV2], 1, &crampMCP[MCPHV3], enabledSlots[i]-38);
-	_mcp3426_init(&adc[enabledSlots[i]], &i2c_cramps[i]);
-
-	//_mcp3426_init(&adc[enabledSlots[i]], MCPPINBASE+16*MCPHV3+(enabledSlots[i]-38),MCPPINBASE+16*MCPHV2+1); 
-
-    }
+  for (int i = 0 ; i < 4; i++){
+    _AMBmcp3426_init(&adc[i], &mi2c_cramps[i]);
   }
 
 
 
+  for (int i = 0; i< 4 ; i++){
+    _AMBmcp3426_setconfig(&adc[i],crampchannel);
+  }
+
+  
+  printf("done init\n");
 }
 
 
 
 int main(int argc, char *argv[])
 {
-  FILE *pFile;
-  pFile=fopen("htp_2.txt", "a+");
-  initialization();
+
+  int channelnumber = atoi(argv[1]);
+  //  FILE *pFile;
+  //  pFile=fopen("htp_2.txt", "a+");
+  readInput();
+  initialization(channelnumber);
+
+
+  wiringPiSetup();
 
 
   char * outputFilename = "currvstime.csv";
   FILE *fpt;
   fpt = fopen(outputFilename, "w+"); //output file
    
-  
+  //  sleep(1);
   //  int channel = atoi(argv[1]);
 
 
   int n = 0;
 
+  int countloop =0 ;
 
-  while (keepRunning){
-
+  while (keepRunning ){
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
-    
 
-    char * p = ctime(&ts.tv_sec); /* Note that ctime() isn't thread-safe. */
-    p[strcspn(p, "\r\n")] = 0;
+    clock_t t;
+    t = clock();
+
+
 
     //    fprintf(fpt, "%d-%d-%d %d:%d:%d,", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
     //    printf("%s %7.1f\n", p, ts.tv_nsec/1e6);
-    fprintf(fpt,"%s %7.1f ", p, ts.tv_nsec/1e6);
+    //    fprintf(fpt,"%s %7.1f ", p, ts.tv_nsec/1e6);
+
+
+    float currents[24];
+    float currents1[24];
+    float tmpcurrents[24];
+    float tmpcurrents1[24];
+
+    uint8_t ncramps = 0;
+    int tmp = 0;
+    uint8_t currentArrayIndex = 0;
 
 
     //first do the 0 channels
-    for (int i = 0; i < SlotCounter; i++) {
-  
-      if (enabledSlots[i] >= 0) {
-	currents[2*i] = 0;
+    for (int i = 0; i< 4 ; i++){    
+      ncramps = adc[i]._mi2c->_nCramps;
+      //      uint8_t retc = 0;
+      uint8_t retc = _AMBmcp3426_read(&adc[i], &tmpcurrents);
+      if (retc==9){
 
-        int tmp = 0;
-	tmp =  _mcp3426_setconfig(&adc[enabledSlots[i]],0);
-	//	sleep(1);
-	currents[2*i] = 1e2*_mcp3426_read(&adc[enabledSlots[i]]);
-
+	recover();
+	printf("Recover on error\n");
+	usleep(100);
+	initialization(channelnumber);
+	continue;
+	//	exit(1);
       }
-    }
-    //now do the 1 channels
-    for (int i = 0; i < SlotCounter; i++) {
-  
-      if (enabledSlots[i] >= 0) {
-	currents[2*i+1] = 0;
-
-        int tmp = 0;
-	tmp =  _mcp3426_setconfig(&adc[enabledSlots[i]],0);
-	//	sleep(1);
-	currents[2*i+1] = 1e2*_mcp3426_read(&adc[enabledSlots[i]]);
-
-      }
+      memcpy(currents+currentArrayIndex, tmpcurrents, sizeof(float)*ncramps );
+      currentArrayIndex += ncramps;
     }
 
 
+     //currentArrayIndex = 0; 
+     //for (int i = 0; i< 4 ; i++){ 
+     //  tmp =  _AMBmcp3426_setconfig(&adc[i],1); 
+     //} 
 
+     ////then do the 1 channels */
+     //for (int i = 0; i< 4 ; i++){ 
+     //  ncramps = adc[i]._mi2c->_nCramps; 
+     //  _AMBmcp3426_read(&adc[i], &tmpcurrents1); 
+     //  memcpy(currents1+currentArrayIndex, tmpcurrents1, sizeof(float)*ncramps ); 
+     //  currentArrayIndex += ncramps; 
+     //} 
 
+    struct timeval tv;
+    time_t nowtime;
+    struct tm *nowtm;
+    char tmbuf[64], buf[64];
+    
+    gettimeofday(&tv, NULL);
+    nowtime = tv.tv_sec;
+    nowtm = localtime(&nowtime);
+    strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", nowtm);
+    fprintf(fpt,"%s.%06ld", tmbuf, tv.tv_usec);
+    fprintf(fpt,",");
 
+    
+    for (int i = 0 ; i < currentArrayIndex; i++){
+      currents[i] = 1e2*currents[i];
+      //      printf(" %8.4f  ",currents[i]);
 
-
-    for (int i = 0; i < SlotCounter; i++) {
+      fprintf(fpt,"%8.4f,",currents[i]);
       
-	
-      //      printf("%d %.3f,%.3f\n", enabledSlots[i],currents[2*i], currents[2*i+1]);
-      fprintf(fpt," %.3f,%.3f", currents[2*i], currents[2*i+1]);
-
     }
+    //    printf("\n");
     fprintf(fpt,"\n");
 
 
-    /*
+
+
+    /* for (int i = 0; i < SlotCounter; i++) { */
+  
+    /*   if (enabledSlots[i] >= 0) { */
+    /* 	currents[2*i] = 0; */
+
+    /*     int tmp = 0; */
+    /* 	tmp =  _AMBmcp3426_setconfig(&adc[enabledSlots[i]],0); */
+    /* 	//	sleep(1); */
+    /* 	currents[2*i] = 1e2*_AMBmcp3426_read(&adc[enabledSlots[i]]); */
+
+    /*   } */
+    /* } */
+    /* //now do the 1 channels */
+    /* for (int i = 0; i < SlotCounter; i++) { */
+  
+    /*   if (enabledSlots[i] >= 0) { */
+    /* 	currents[2*i+1] = 0; */
+
+    /*     int tmp = 0; */
+    /* 	tmp =  _AMBmcp3426_setconfig(&adc[enabledSlots[i]],0); */
+    /* 	//	sleep(1); */
+    /* 	currents[2*i+1] = 1e2*_AMBmcp3426_read(&adc[enabledSlots[i]]); */
+
+    /*   } */
+    /* } */
+
+
+
+
+
+
+
+    /* for (int i = 0; i < SlotCounter; i++) { */
+      
+	
+    /*         printf("%d %.3f,%.3f\n", enabledSlots[i],currents[2*i], currents[2*i+1]); */
+    /*         fprintf(fpt," %.3f,%.3f", currents[2*i], currents[2*i+1]); */
+
+    /* } */
+    /* fprintf(fpt,"\n"); */
+
+
+
     struct timespec tend;
     clock_gettime(CLOCK_REALTIME, &tend);
 
     double seconds = (tend.tv_sec - ts.tv_sec) + (tend.tv_nsec - ts.tv_nsec)/1e9;
+
+    t = clock() - t;
+    double time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds
  
-    printf("%f seconds\n", seconds);
-    */
+    //    printf("Entire loop took %f seconds to execute \n", time_taken);
+
+    
+    if (countloop%100 == 0)
+      printf("%f seconds\n", seconds);
+
+    countloop++;
 
 
-
+    //   keepRunning = 0;
     
 
 }

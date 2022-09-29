@@ -27,7 +27,7 @@
 #define MI2C_ACK 0
 
 /** Delay used for software MI2C */
-#define MI2C_DELAY_USEC 40
+#define MI2C_DELAY_USEC 1
 
 /** Bit to or with address for read start and read restart */
 #define MI2C_READ 1

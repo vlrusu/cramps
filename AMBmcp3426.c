@@ -4,6 +4,7 @@
 #include "AMBmcp3426.h"
 
 #include <unistd.h>
+#include <time.h>
 
 void _AMBmcp3426_init(AMBmcp3426_t* self, MI2C* mi2c){
 
@@ -11,7 +12,7 @@ void _AMBmcp3426_init(AMBmcp3426_t* self, MI2C* mi2c){
 
   //ocbit not set 0x80 no effect on RDY bit continuous conversion mode
   uint8_t gain = 0; //default x1
-  uint8_t samplerate = 2;// 16SPS 16 bit
+  uint8_t samplerate = 1;// 16SPS 16 bit
   uint8_t mode = 1;// 1 - continuous conversion 0 - one-shot
   uint8_t channel = 0; //obviously this will be changed by the code
   self->config = 0x80 | (channel << 5) | (mode << 4) | (samplerate << 2) | (gain) ;
@@ -39,6 +40,8 @@ uint16_t _AMBmcp3426_setconfig(AMBmcp3426_t* self, int channel){
 uint16_t _AMBmcp3426_read(AMBmcp3426_t* self, float* dataByCramp){
 
 
+
+  
   uint16_t firstByte[8];
   uint16_t secondByte[8];
   uint16_t thirdByte[8];
@@ -58,12 +61,17 @@ uint16_t _AMBmcp3426_read(AMBmcp3426_t* self, float* dataByCramp){
   //  check the conversion ready bit
 
 
-
 	
     retc = MI2C_start(self->_mi2c, AMBMCP3426_ADDRESS << 1 | MI2C_READ);
 
 
     if (retc != MI2C_ACK) {fprintf(stderr, "Repeated No device found at address %0xh %x\n", AMBMCP3426_ADDRESS, retc);}
+
+    clock_t t;
+    t = clock();
+
+
+
     MI2C_read(self->_mi2c,0,&firstByte);
 
     /* for (int i =0; i < 8; i++) */
@@ -71,6 +79,7 @@ uint16_t _AMBmcp3426_read(AMBmcp3426_t* self, float* dataByCramp){
     
     MI2C_read(self->_mi2c,0,&secondByte);
 
+      
 
     //keep checking the RDY bit to make sure the next conversion is ready
     while (1){
@@ -86,6 +95,7 @@ uint16_t _AMBmcp3426_read(AMBmcp3426_t* self, float* dataByCramp){
 
     /*
      */
+
 
     //rearrange by cramp
     for (uint8_t i = 0; i<8; i++) {
@@ -111,11 +121,13 @@ uint16_t _AMBmcp3426_read(AMBmcp3426_t* self, float* dataByCramp){
       }
     }
 
+   
+    
     //    
     for (uint8_t chn = 0; chn<nCramps; chn++) {
       if ( (thirdByteByCramp[chn] & 0x7F) != (self->config & 0x7F) ) {
 	fprintf(stderr, "Bad address in location %d config %0xh should be %0xh\n", chn, thirdByteByCramp[chn], self->config);
-	return 0;
+	return 9;
       }
     }
 
@@ -129,7 +141,7 @@ uint16_t _AMBmcp3426_read(AMBmcp3426_t* self, float* dataByCramp){
 
     }
 
-    usleep(5000); //don't know why I need this here, but w/o a delay.the RDY bit above never gets set.
+    //    usleep(5000); //don't know why I need this here, but w/o a delay.the RDY bit above never gets set.
     //    printf("countRead=%d %d\n",countReady,nCramps);
 
     //    exit(1);
@@ -148,6 +160,7 @@ uint16_t _AMBmcp3426_read(AMBmcp3426_t* self, float* dataByCramp){
 
     }
 
+
     MI2C_read(self->_mi2c,1,&thirdByte);    
     MI2C_stop(self->_mi2c);
     
@@ -161,6 +174,13 @@ uint16_t _AMBmcp3426_read(AMBmcp3426_t* self, float* dataByCramp){
 
   }
 
+
+  t = clock() - t;
+  double time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds
+  
+  //  printf("Read took %f seconds to execute \n", time_taken);
+
+  
   return retc;
 
 
